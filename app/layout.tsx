@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   description:
     "$POOL is liquidity that compounds. Every trade makes the pool thicker. No dev extraction. No draining. Just depth.",
   icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }, { url: "/icon.png", type: "image/png", sizes: "32x32" }],
-    shortcut: "/icon.png",
-    apple: "/icon.png",
+    icon: [{ url: "/icon.png?v=2", type: "image/png" }, { url: "/icon.png?v=2", type: "image/png", sizes: "32x32" }],
+    shortcut: "/icon.png?v=2",
+    apple: "/icon.png?v=2",
   },
 };
 
@@ -34,8 +34,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
-        <link rel="icon" href="/icon.png" type="image/png" sizes="32x32" />
-        <link rel="shortcut icon" href="/icon.png" type="image/png" />
+        <link rel="icon" href="/icon.png?v=2" type="image/png" sizes="32x32" />
+        <link rel="shortcut icon" href="/icon.png?v=2" type="image/png" />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;500;600;700&display=swap"
