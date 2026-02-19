@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   title: "$POOL — The Pool Only Gets Deeper",
   description:
     "$POOL is liquidity that compounds. Every trade makes the pool thicker. No dev extraction. No draining. Just depth.",
+  icons: {
+    icon: "/pool.png",
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
+        <link rel="icon" href="/pool.png" />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;500;600;700&display=swap"
