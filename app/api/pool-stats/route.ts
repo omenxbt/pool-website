@@ -5,6 +5,7 @@ import {
   HELIUS_API_KEY,
   INITIAL_GRADUATION_LIQUIDITY_SOL,
 } from "@/lib/constants";
+import { getEnhancedTransactions } from "@/lib/helius";
 
 /** Fetch SOL price in USD from CoinGecko (no key required). */
 async function getSolPriceUsd(): Promise<number> {
@@ -53,38 +54,13 @@ async function fetchDepthFromDexScreener(
   return { depthSol, depthGrowth };
 }
 
-/** Fees compounded (SOL) = sum of SOL sent from Bootstrap in ADD_LIQUIDITY txs. */
-async function fetchFeesCompoundedFromHelius(
-  bootstrapWallet: string,
-  apiKey: string
-): Promise<number> {
-  if (!bootstrapWallet || !apiKey) return 0;
-
-  const url = `https://api.helius.xyz/v0/addresses/${bootstrapWallet}/transactions?api-key=${apiKey}&type=ADD_LIQUIDITY&limit=100`;
-  const res = await fetch(url, { next: { revalidate: 30 } });
-  if (!res.ok) return 0;
-
-  const txs = (await res.json()) as Array<{
-    nativeTransfers?: Array<{
-      fromUserAccount?: string;
-      toUserAccount?: string;
-      amount: number;
-    }>;
-  }>;
-
-  const bootstrapLower = bootstrapWallet.toLowerCase();
-  let totalLamports = 0;
-
-  for (const tx of txs) {
-    const native = tx.nativeTransfers ?? [];
-    for (const t of native) {
-      if (t.fromUserAccount?.toLowerCase() === bootstrapLower && t.amount > 0) {
-        totalLamports += t.amount;
-      }
-    }
-  }
-
-  return totalLamports / 1e9;
+/** Fees compounded (SOL) = sum of SOL used by Bootstrap in LP_ADD (add liquidity) txs. */
+async function getFeesCompoundedSol(bootstrapWallet: string): Promise<number> {
+  if (!bootstrapWallet) return 0;
+  const txs = await getEnhancedTransactions(bootstrapWallet, 150);
+  return txs
+    .filter((t) => t.type === "LP_ADD")
+    .reduce((sum, t) => sum + t.amount, 0);
 }
 
 /** Compute health score (0–100). */
@@ -116,7 +92,7 @@ export async function GET() {
 
   const [depthResult, feesResult] = await Promise.allSettled([
     fetchDepthFromDexScreener(POOL_TOKEN_MINT),
-    fetchFeesCompoundedFromHelius(BOOTSTRAP_WALLET, HELIUS_API_KEY),
+    getFeesCompoundedSol(BOOTSTRAP_WALLET),
   ]);
 
   if (depthResult.status === "fulfilled") {

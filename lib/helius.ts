@@ -25,6 +25,7 @@ interface NativeTransfer {
 interface TokenTransfer {
   tokenSymbol?: string;
   tokenAmount?: number;
+  mint?: string;
   fromUserAccount?: string;
   toUserAccount?: string;
 }
@@ -115,4 +116,35 @@ export async function getEnhancedTransactions(
     seen.add(p.hash);
     return true;
   });
+}
+
+/**
+ * Sum of POOL tokens sent (sold) by a wallet — for dev wallet "tokens sold" metric.
+ */
+export async function getTokensSoldByWallet(
+  wallet: string,
+  poolMint: string,
+  limit = 100
+): Promise<number> {
+  if (!HELIUS_API_KEY || !wallet || !poolMint) return 0;
+  const url = `${HELIUS_BASE}/v0/addresses/${wallet}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`;
+  const res = await fetch(url, { next: { revalidate: 60 } });
+  if (!res.ok) return 0;
+  const data = (await res.json()) as HeliusTransaction[];
+  const walletLower = wallet.toLowerCase();
+  const mintLower = poolMint.toLowerCase();
+  let total = 0;
+  for (const tx of data) {
+    const token = tx.tokenTransfers ?? [];
+    for (const t of token) {
+      if (
+        t.fromUserAccount?.toLowerCase() === walletLower &&
+        t.mint?.toLowerCase() === mintLower &&
+        (t.tokenAmount ?? 0) > 0
+      ) {
+        total += t.tokenAmount ?? 0;
+      }
+    }
+  }
+  return total;
 }

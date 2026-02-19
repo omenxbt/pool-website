@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { DEV_WALLET, HELIUS_API_KEY, POOL_TOKEN_MINT } from "@/lib/constants";
+import { getTokensSoldByWallet } from "@/lib/helius";
 import { lamportsToSol } from "@/lib/utils";
 
 const RPC = HELIUS_API_KEY
@@ -20,9 +21,12 @@ export async function GET() {
   const devPubkey = new PublicKey(DEV_WALLET);
 
   try {
-    const [solBalance, tokenAccounts] = await Promise.all([
+    const [solBalance, tokenAccounts, tokensSold] = await Promise.all([
       connection.getBalance(devPubkey),
       connection.getParsedTokenAccountsByOwner(devPubkey, { programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") }),
+      POOL_TOKEN_MINT && HELIUS_API_KEY
+        ? getTokensSoldByWallet(DEV_WALLET, POOL_TOKEN_MINT, 100)
+        : Promise.resolve(0),
     ]);
 
     let poolTokenBalance = 0;
@@ -40,9 +44,6 @@ export async function GET() {
         lpContributed += amount; // or derive from LP token value
       }
     }
-
-    // Tokens sold: would require tx history; placeholder 0
-    const tokensSold = 0;
 
     return NextResponse.json({
       holdings: poolTokenBalance,
