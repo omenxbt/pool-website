@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
   --foreground: #171717;
+  --accent: #0090ff;
+  --accent-light: #e8f4ff;
+  --font-sans: var(--font-sora), "Sora", sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", monospace;
+  /* Baby blue theme - no white anywhere */
+  --bg: #EEF6FF;
+  --bg-card: #E4F0FF;
+  --gray-border: rgba(0, 100, 200, 0.1);
+  --card-surface: rgba(255, 255, 255, 0.6);
 }
 
 @theme inline {
-  --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
-  background: var(--background);
+  background-color: #EEF6FF !important;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Sora", var(--font-sans);
+}
+
+.font-mono {
+  font-family: "Space Mono", var(--font-mono);
+}
+
+/* Hero: 3 concentric pulsing rings */
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.03); }
+}
+
+@keyframes poolFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes waterFill {
+  0% { height: 20%; }
+  100% { height: 55%; }
+}
+
+.animate-ring-pulse {
+  animation: ringPulse 2.5s ease-in-out infinite;
+}
+
+.animate-pool-float {
+  animation: poolFloat 6s ease-in-out infinite;
+}
+
+.animate-water-fill {
+  animation: waterFill 2s ease-out forwards;
+}
+
+/* Feed */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-flash-new {
+  animation: flashNew 1s ease-out;
+}
+
+@keyframes flashNew {
+  0% {
+    border-color: rgba(0, 144, 255, 0.4);
+    background: rgba(232, 244, 255, 0.9);
+  }
+  100% {
+    border-color: rgba(0, 100, 200, 0.1);
+    background: transparent;
+  }
 }
