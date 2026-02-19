@@ -32,7 +32,7 @@ interface TokenTransfer {
 
 interface HeliusTransaction {
   signature: string;
-  timestamp: string; // ISO
+  timestamp: string | number; // ISO string or Unix seconds
   type: string;
   nativeTransfers?: NativeTransfer[];
   tokenTransfers?: TokenTransfer[];
@@ -42,7 +42,7 @@ interface HeliusTransaction {
 
 /**
  * Fetch enhanced transaction history for an address.
- * Filter and categorize: FEE IN (incoming SOL), BUYBACK (swap), LP ADD (add liquidity).
+ * Classification order: FEE_IN first, then LP_ADD, then BUYBACK (so LP adds are never misclassified as swaps).
  */
 export async function getEnhancedTransactions(
   address: string,
@@ -52,60 +52,85 @@ export async function getEnhancedTransactions(
     return [];
   }
   const url = `${HELIUS_BASE}/v0/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 30 } });
   if (!res.ok) return [];
   const data = (await res.json()) as HeliusTransaction[];
-  const bootstrap = address.toLowerCase();
+  const addr = address.toLowerCase();
   const parsed: ParsedTransaction[] = [];
 
+  const hasIncomingSol = (n: NativeTransfer[]) =>
+    n.some((t) => t.toUserAccount?.toLowerCase() === addr && t.amount > 0);
+  const hasOutgoingSol = (n: NativeTransfer[]) =>
+    n.some((t) => t.fromUserAccount?.toLowerCase() === addr && t.amount > 0);
+  const hasSolMovement = (n: NativeTransfer[]) => hasIncomingSol(n) || hasOutgoingSol(n);
+  const incomingSolAmount = (n: NativeTransfer[]) => {
+    const t = n.find((x) => x.toUserAccount?.toLowerCase() === addr && x.amount > 0);
+    return t ? lamportsToSol(t.amount) : 0;
+  };
+  const outgoingSolAmount = (n: NativeTransfer[]) => {
+    const t = n.find((x) => x.fromUserAccount?.toLowerCase() === addr && x.amount > 0);
+    return t ? lamportsToSol(t.amount) : 0;
+  };
+  const addrInTokenTransfer = (tok: TokenTransfer[]) =>
+    tok.some(
+      (t) =>
+        t.fromUserAccount?.toLowerCase() === addr || t.toUserAccount?.toLowerCase() === addr
+    );
+
   for (const tx of data) {
-    const ts = new Date(tx.timestamp);
+    // Helius may return timestamp as Unix seconds (number); Date() expects ms for numbers
+    const ts =
+      typeof tx.timestamp === "number"
+        ? new Date(tx.timestamp * 1000)
+        : new Date(tx.timestamp);
     const native = tx.nativeTransfers ?? [];
     const token = tx.tokenTransfers ?? [];
+    const desc = tx.description ?? "";
+    const type = (tx.type ?? "").toUpperCase();
+    const source = (tx.source ?? "").toUpperCase();
 
-    // Incoming SOL to Bootstrap = creator fee routed in
-    const incomingSol = native.find(
-      (t) => t.toUserAccount?.toLowerCase() === bootstrap && t.amount > 0
-    );
-    if (incomingSol) {
-      parsed.push({
-        type: "FEE_IN",
-        amount: lamportsToSol(incomingSol.amount),
-        hash: tx.signature,
-        timestamp: ts,
-      });
-      continue;
-    }
-
-    // Swap (Jupiter / PumpSwap) = buyback
-    if (tx.type === "SWAP" || tx.source === "JUPITER" || tx.description?.toLowerCase().includes("swap")) {
-      const solOut = native.find((t) => t.fromUserAccount?.toLowerCase() === bootstrap);
-      const solIn = native.find((t) => t.toUserAccount?.toLowerCase() === bootstrap);
-      const amount = solIn ? lamportsToSol(solIn.amount) : (solOut ? -lamportsToSol(solOut.amount) : 0);
-      if (amount !== 0) {
-        parsed.push({
-          type: "BUYBACK",
-          amount: Math.abs(amount),
-          hash: tx.signature,
-          timestamp: ts,
-        });
+    // 1) FEE_IN: any tx where the address receives incoming SOL (toUserAccount === address)
+    if (hasIncomingSol(native)) {
+      const amount = incomingSolAmount(native);
+      if (amount > 0) {
+        parsed.push({ type: "FEE_IN", amount, hash: tx.signature, timestamp: ts });
       }
       continue;
     }
 
-    // Add liquidity
-    if (
-      tx.type === "ADD_LIQUIDITY" ||
-      tx.description?.toLowerCase().includes("add liquidity") ||
-      (token.some((t) => t.toUserAccount?.toLowerCase() === bootstrap) && native.some((t) => t.fromUserAccount?.toLowerCase() === bootstrap))
-    ) {
-      const solUsed = native.find((t) => t.fromUserAccount?.toLowerCase() === bootstrap);
-      parsed.push({
-        type: "LP_ADD",
-        amount: solUsed ? lamportsToSol(solUsed.amount) : 0,
-        hash: tx.signature,
-        timestamp: ts,
-      });
+    // 2) LP_ADD: type ADD_LIQUIDITY, or description match, or SOL out + token in (explicit LP only; fallback after BUYBACK)
+    const isLpType = type === "ADD_LIQUIDITY" || /add liquidity|liquidity|add.*liquidity/i.test(desc);
+    const addressSentSolAndReceivedToken =
+      hasOutgoingSol(native) && token.some((t) => t.toUserAccount?.toLowerCase() === addr);
+    if (isLpType || addressSentSolAndReceivedToken) {
+      const amount = outgoingSolAmount(native);
+      if (amount > 0) {
+        parsed.push({ type: "LP_ADD", amount, hash: tx.signature, timestamp: ts });
+      }
+      continue;
+    }
+
+    // 3) BUYBACK: type SWAP or description match, or Jupiter swap present, or SOL movement + token involvement
+    const isSwapType = type === "SWAP" || /swap|buy|sell|trade|pump/i.test(desc);
+    const isJupiterSwap = source === "JUPITER" || /jupiter/i.test(desc);
+    const hasSolAndTokenMovement =
+      hasSolMovement(native) && token.length > 0 && addrInTokenTransfer(token);
+    if (isSwapType || isJupiterSwap || hasSolAndTokenMovement) {
+      const solIn = native.find((t) => t.toUserAccount?.toLowerCase() === addr);
+      const solOut = native.find((t) => t.fromUserAccount?.toLowerCase() === addr);
+      const amount = solIn ? lamportsToSol(solIn.amount) : (solOut ? lamportsToSol(solOut.amount) : 0);
+      if (amount > 0) {
+        parsed.push({ type: "BUYBACK", amount, hash: tx.signature, timestamp: ts });
+      }
+      continue;
+    }
+
+    // 4) LP_ADD fallback: address sends SOL and wasn't already classified as FEE_IN (catch-all for compounded SOL)
+    if (hasOutgoingSol(native)) {
+      const amount = outgoingSolAmount(native);
+      if (amount > 0) {
+        parsed.push({ type: "LP_ADD", amount, hash: tx.signature, timestamp: ts });
+      }
     }
   }
 
