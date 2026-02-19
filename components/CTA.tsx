@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PUMPSWAP_URL, BOOTSTRAP_INFO_URL } from "@/lib/constants";
+import { PUMPSWAP_URL } from "@/lib/constants";
 
 export default function CTA() {
   return (
@@ -24,7 +24,7 @@ export default function CTA() {
             Buy $POOL
           </Link>
           <Link
-            href={BOOTSTRAP_INFO_URL}
+            href="https://x.com/bootstrapliq"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center px-6 py-3 rounded-[10px] font-semibold hover:bg-[#E8F4FF] transition-colors"
