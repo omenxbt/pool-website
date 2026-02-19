@@ -8,7 +8,6 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const statLabels: Record<string, string> = {
   depth: "Pool Depth",
   depthGrowth: "Depth Growth",
-  feesCompounded: "Fees Compounded",
   healthScore: "Health Score",
 };
 
@@ -30,11 +29,6 @@ export default function StatsBar() {
           isAccent: true,
         },
         {
-          label: statLabels.feesCompounded,
-          value: `${formatSol(data.feesCompounded ?? 0)} SOL`,
-          isAccent: true,
-        },
-        {
           label: statLabels.healthScore,
           value: `${data.healthScore ?? 0}/100`,
           isAccent: false,
@@ -43,7 +37,6 @@ export default function StatsBar() {
     : [
         { label: statLabels.depth, value: "—", isAccent: false },
         { label: statLabels.depthGrowth, value: "—", isAccent: false },
-        { label: statLabels.feesCompounded, value: "—", isAccent: false },
         { label: statLabels.healthScore, value: "—", isAccent: false },
       ];
 
