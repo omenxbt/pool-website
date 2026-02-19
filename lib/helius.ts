@@ -101,8 +101,11 @@ export async function getEnhancedTransactions(
       continue;
     }
 
-    // 2) FEE_IN: any tx where the address receives incoming SOL (no LP_ADD already matched)
-    if (hasIncomingSol(native)) {
+    // 2) FEE_IN: only when address has incoming SOL and it's not an LP add or swap (no outgoing SOL, no LP/swap type or description)
+    const isLpOrSwapTypeOrDesc =
+      type === "ADD_LIQUIDITY" || /add liquidity|liquidity|swap|buy|sell|trade/i.test(desc);
+    const onlyIncomingNoOutgoing = hasIncomingSol(native) && !hasOutgoingSol(native);
+    if (onlyIncomingNoOutgoing && !isLpOrSwapTypeOrDesc) {
       const amount = incomingSolAmount(native);
       if (amount > 0) {
         parsed.push({ type: "FEE_IN", amount, hash: tx.signature, timestamp: ts });
