@@ -17,6 +17,6 @@ export const SOLSCAN_TX_BASE = "https://solscan.io/tx";
 
 /** PumpSwap / Bootstrap links */
 export const PUMPSWAP_URL = "https://pump.fun/coin/3jMBfPMyuj7KQBziqS2J9UdtjbrgDaxF6aUzWgv9pump";
-export const DEXSCREENER_URL = "https://dexscreener.com/solana";
+export const DEXSCREENER_URL = "https://dexscreener.com/solana/9frtavcnursth6aaim8db9huqzeu9ckcqpv14orzfifh";
 export const BOOTSTRAP_INFO_URL = "https://bootstrap.fun"; // adjust if different
 export const X_POOL_HANDLE = "https://x.com/pool_tokenxyz";
