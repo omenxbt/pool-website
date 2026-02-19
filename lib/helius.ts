@@ -42,7 +42,7 @@ interface HeliusTransaction {
 
 /**
  * Fetch enhanced transaction history for an address.
- * Classification order: FEE_IN first, then LP_ADD, then BUYBACK (so LP adds are never misclassified as swaps).
+ * Classification order: LP_ADD first (so LP adds aren't swallowed by FEE_IN), then FEE_IN, BUYBACK, then LP_ADD fallback.
  */
 export async function getEnhancedTransactions(
   address: string,
@@ -89,16 +89,7 @@ export async function getEnhancedTransactions(
     const type = (tx.type ?? "").toUpperCase();
     const source = (tx.source ?? "").toUpperCase();
 
-    // 1) FEE_IN: any tx where the address receives incoming SOL (toUserAccount === address)
-    if (hasIncomingSol(native)) {
-      const amount = incomingSolAmount(native);
-      if (amount > 0) {
-        parsed.push({ type: "FEE_IN", amount, hash: tx.signature, timestamp: ts });
-      }
-      continue;
-    }
-
-    // 2) LP_ADD: type ADD_LIQUIDITY, or description match, or SOL out + token in (explicit LP only; fallback after BUYBACK)
+    // 1) LP_ADD first: type ADD_LIQUIDITY, or description match, or address sends SOL and receives token (so LP adds aren't swallowed by FEE_IN)
     const isLpType = type === "ADD_LIQUIDITY" || /add liquidity|liquidity|add.*liquidity/i.test(desc);
     const addressSentSolAndReceivedToken =
       hasOutgoingSol(native) && token.some((t) => t.toUserAccount?.toLowerCase() === addr);
@@ -106,6 +97,15 @@ export async function getEnhancedTransactions(
       const amount = outgoingSolAmount(native);
       if (amount > 0) {
         parsed.push({ type: "LP_ADD", amount, hash: tx.signature, timestamp: ts });
+      }
+      continue;
+    }
+
+    // 2) FEE_IN: any tx where the address receives incoming SOL (no LP_ADD already matched)
+    if (hasIncomingSol(native)) {
+      const amount = incomingSolAmount(native);
+      if (amount > 0) {
+        parsed.push({ type: "FEE_IN", amount, hash: tx.signature, timestamp: ts });
       }
       continue;
     }
@@ -125,7 +125,7 @@ export async function getEnhancedTransactions(
       continue;
     }
 
-    // 4) LP_ADD fallback: address sends SOL and wasn't already classified as FEE_IN (catch-all for compounded SOL)
+    // 4) LP_ADD fallback: address sends SOL and wasn't already classified (catch-all for compounded SOL)
     if (hasOutgoingSol(native)) {
       const amount = outgoingSolAmount(native);
       if (amount > 0) {

@@ -12,11 +12,13 @@ export async function GET(request: Request) {
 
   const txs = await getEnhancedTransactions(DEV_WALLET, limit);
   return NextResponse.json(
-    txs.map((t) => ({
-      type: t.type,
-      amount: t.amount,
-      hash: t.hash,
-      timestamp: t.timestamp.toISOString(),
-    }))
+    txs
+      .filter((t) => t.amount >= 0.01)
+      .map((t) => ({
+        type: t.type,
+        amount: t.amount,
+        hash: t.hash,
+        timestamp: t.timestamp.toISOString(),
+      }))
   );
 }
