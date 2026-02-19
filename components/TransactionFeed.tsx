@@ -46,7 +46,7 @@ export default function TransactionFeed() {
             className="font-mono font-bold uppercase"
             style={{ fontSize: "11px", letterSpacing: "2px", color: "#0090FF" }}
           >
-            $POOL Transactions
+            DEV WALLET ACTIVITY
           </p>
           <span
             className="font-mono font-semibold inline-flex items-center gap-2"
@@ -64,7 +64,7 @@ export default function TransactionFeed() {
               className="rounded-xl py-8 px-6 text-center text-gray-500 font-mono text-sm"
               style={{ border: "1.5px solid rgba(0, 100, 200, 0.1)", background: "rgba(255, 255, 255, 0.6)" }}
             >
-              No transactions yet. Configure BOOTSTRAP_WALLET and HELIUS_API_KEY.
+              No transactions yet. Configure DEV_WALLET and HELIUS_API_KEY.
             </div>
           ) : (
             txs.map((tx, i) => (
