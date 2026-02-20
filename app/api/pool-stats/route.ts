@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   POOL_TOKEN_MINT,
-  BOOTSTRAP_WALLET,
-  HELIUS_API_KEY,
   INITIAL_GRADUATION_LIQUIDITY_SOL,
 } from "@/lib/constants";
 
@@ -53,26 +51,6 @@ async function fetchDepthFromDexScreener(
   return { depthSol, depthGrowth };
 }
 
-async function getFeesCompoundedSol(bootstrapWallet: string): Promise<number> {
-  if (!bootstrapWallet || !HELIUS_API_KEY) return 0;
-  const res = await fetch(
-    `https://api.helius.xyz/v0/addresses/${bootstrapWallet}/transactions?api-key=${HELIUS_API_KEY}&limit=150`,
-    { next: { revalidate: 30 } }
-  );
-  if (!res.ok) return 0;
-  const data = await res.json();
-  const addr = bootstrapWallet.toLowerCase();
-  let total = 0;
-  for (const tx of data) {
-    const native = tx.nativeTransfers ?? [];
-    const incoming = native
-      .filter((t: { toUserAccount?: string; amount: number }) => t.toUserAccount?.toLowerCase() === addr && t.amount > 0)
-      .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0);
-    if (incoming > 0) total += incoming / 1_000_000_000;
-  }
-  return Math.round(total * 1000) / 1000;
-}
-
 /** Compute health score (0–100). */
 function computeHealthScore(opts: {
   depthSol: number;
@@ -96,22 +74,7 @@ function computeHealthScore(opts: {
 }
 
 export async function GET() {
-  let depthSol = 0;
-  let depthGrowth = 0;
-  let feesCompoundedSol = 0;
-
-  const [depthResult, feesResult] = await Promise.allSettled([
-    fetchDepthFromDexScreener(POOL_TOKEN_MINT),
-    getFeesCompoundedSol(BOOTSTRAP_WALLET),
-  ]);
-
-  if (depthResult.status === "fulfilled") {
-    depthSol = depthResult.value.depthSol;
-    depthGrowth = depthResult.value.depthGrowth;
-  }
-  if (feesResult.status === "fulfilled") {
-    feesCompoundedSol = feesResult.value;
-  }
+  const { depthSol, depthGrowth } = await fetchDepthFromDexScreener(POOL_TOKEN_MINT);
 
   const healthScore = computeHealthScore({
     depthSol,
@@ -124,7 +87,6 @@ export async function GET() {
   return NextResponse.json({
     depth: depthSol,
     depthGrowth,
-    feesCompounded: feesCompoundedSol,
     healthScore,
   });
 }
