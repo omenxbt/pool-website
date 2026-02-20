@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import {
   POOL_TOKEN_MINT,
   BOOTSTRAP_WALLET,
+  HELIUS_API_KEY,
   INITIAL_GRADUATION_LIQUIDITY_SOL,
 } from "@/lib/constants";
-import { getEnhancedTransactions } from "@/lib/helius";
 
 /** Fetch SOL price in USD from CoinGecko (no key required). */
 async function getSolPriceUsd(): Promise<number> {
@@ -54,11 +54,23 @@ async function fetchDepthFromDexScreener(
 }
 
 async function getFeesCompoundedSol(bootstrapWallet: string): Promise<number> {
-  if (!bootstrapWallet) return 0;
-  const txs = await getEnhancedTransactions(bootstrapWallet, 150);
-  return txs
-    .filter((t) => t.type === "FEE_IN" && t.amount >= 0.01)
-    .reduce((sum, t) => sum + t.amount, 0);
+  if (!bootstrapWallet || !HELIUS_API_KEY) return 0;
+  const res = await fetch(
+    `https://api.helius.xyz/v0/addresses/${bootstrapWallet}/transactions?api-key=${HELIUS_API_KEY}&limit=150`,
+    { next: { revalidate: 30 } }
+  );
+  if (!res.ok) return 0;
+  const data = await res.json();
+  const addr = bootstrapWallet.toLowerCase();
+  let total = 0;
+  for (const tx of data) {
+    const native = tx.nativeTransfers ?? [];
+    const incoming = native
+      .filter((t: { toUserAccount?: string; amount: number }) => t.toUserAccount?.toLowerCase() === addr && t.amount > 0)
+      .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0);
+    if (incoming > 0) total += incoming / 1_000_000_000;
+  }
+  return Math.round(total * 1000) / 1000;
 }
 
 /** Compute health score (0–100). */
