@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   POOL_TOKEN_MINT,
+  BOOTSTRAP_WALLET,
   INITIAL_GRADUATION_LIQUIDITY_SOL,
 } from "@/lib/constants";
+import { getEnhancedTransactions } from "@/lib/helius";
 
 /** Fetch SOL price in USD from CoinGecko (no key required). */
 async function getSolPriceUsd(): Promise<number> {
@@ -51,6 +53,14 @@ async function fetchDepthFromDexScreener(
   return { depthSol, depthGrowth };
 }
 
+async function getFeesCompoundedSol(bootstrapWallet: string): Promise<number> {
+  if (!bootstrapWallet) return 0;
+  const txs = await getEnhancedTransactions(bootstrapWallet, 150);
+  return txs
+    .filter((t) => t.type === "FEE_IN" && t.amount >= 0.01)
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
 /** Compute health score (0–100). */
 function computeHealthScore(opts: {
   depthSol: number;
@@ -74,8 +84,22 @@ function computeHealthScore(opts: {
 }
 
 export async function GET() {
-  const { depthSol, depthGrowth } = await fetchDepthFromDexScreener(POOL_TOKEN_MINT);
-  const feesCompoundedSol = Math.max(0, depthSol - INITIAL_GRADUATION_LIQUIDITY_SOL);
+  let depthSol = 0;
+  let depthGrowth = 0;
+  let feesCompoundedSol = 0;
+
+  const [depthResult, feesResult] = await Promise.allSettled([
+    fetchDepthFromDexScreener(POOL_TOKEN_MINT),
+    getFeesCompoundedSol(BOOTSTRAP_WALLET),
+  ]);
+
+  if (depthResult.status === "fulfilled") {
+    depthSol = depthResult.value.depthSol;
+    depthGrowth = depthResult.value.depthGrowth;
+  }
+  if (feesResult.status === "fulfilled") {
+    feesCompoundedSol = feesResult.value;
+  }
 
   const healthScore = computeHealthScore({
     depthSol,
